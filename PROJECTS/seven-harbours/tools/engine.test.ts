@@ -611,12 +611,25 @@ test("sealed orders: the commit is sha256 of the orders and the salt, and the re
 });
 
 test("sealed orders: a reveal letter is the order lines, then `salt: …` on the last line", () => {
-  const body = "move SAL-R GULL\nhold SAL\nsalt: pebble 41 \n\n";
+  const body = "move SAL-R GULL\nhold SAL\nsalt: pebble 41\n\n";
   const r = parseReveal(body)!;
   assert.equal(r.salt, "pebble 41");
   assert.ok(revealMatches(commitFor("move SAL-R GULL\nhold SAL", "pebble 41"), r.orders, r.salt));
   assert.equal(parseReveal("move SAL-R GULL\nhold SAL"), null, "no salt line, nothing to check");
   assert.equal(parseReveal("move SAL-R GULL\nsalt:"), null, "an empty salt is no salt");
+});
+
+test("sealed orders: a salt with a space at either end survives commit, reveal and check", () => {
+  const orders = "move SAL-R GULL\nhold SAL";
+  const salt = " pebble 41 ";
+  const c = commitFor(orders, salt);
+  const r = parseReveal(`${orders}\nsalt: ${salt}\n`)!;
+  assert.equal(r.salt, salt, "the salt comes back exactly as hashed");
+  assert.ok(revealMatches(c, r.orders, r.salt));
+  assert.ok(!revealMatches(c, r.orders, salt.trim()), "the trimmed salt is another salt");
+  const plain = parseReveal("move SAL-R GULL\nhold SAL\nsalt: pebble-41")!;
+  assert.equal(plain.salt, "pebble-41", "a salt without outer spaces is unchanged");
+  assert.ok(revealMatches(commitFor(orders, "pebble-41"), plain.orders, plain.salt));
 });
 
 test("sealed orders: no commit, no reveal or a wrong reveal, and the ships hold", () => {
